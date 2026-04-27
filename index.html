@@ -47,6 +47,12 @@
       margin-top: 4px;
     }
 
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
     .header-badge {
       background: rgba(139,92,246,0.25);
       border: 1px solid rgba(139,92,246,0.4);
@@ -57,6 +63,64 @@
       border-radius: 20px;
       letter-spacing: 0.3px;
     }
+
+    .sync-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s, border-color 0.15s;
+      white-space: nowrap;
+    }
+
+    .sync-btn:hover {
+      background: rgba(255,255,255,0.18);
+      border-color: rgba(255,255,255,0.35);
+    }
+
+    .sync-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .sync-btn .sync-icon {
+      font-size: 13px;
+      display: inline-block;
+      transition: transform 0.6s;
+    }
+
+    .sync-btn.spinning .sync-icon {
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .sync-toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #1C1C2E;
+      color: #E5E7EB;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 12px 18px;
+      border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      display: none;
+      z-index: 999;
+      max-width: 320px;
+      line-height: 1.5;
+    }
+
+    .sync-toast.show { display: block; }
 
     /* ── KPI Row ── */
     .kpi-row {
@@ -222,7 +286,35 @@
     thead th.sorted .sort-arrow { opacity: 1; }
 
     /* Tooltip on th via title attr is native — enhanced via CSS pseudo */
-    thead th[title] { cursor: help; }
+    /* Custom CSS tooltips */
+    thead th[data-tip] {
+      position: relative;
+    }
+    thead th[data-tip]::after {
+      content: attr(data-tip);
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1C1C2E;
+      color: #E5E7EB;
+      font-size: 11px;
+      font-weight: 400;
+      text-transform: none;
+      letter-spacing: 0;
+      padding: 7px 10px;
+      border-radius: 6px;
+      white-space: normal;
+      width: 210px;
+      line-height: 1.5;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s;
+      z-index: 200;
+    }
+    thead th[data-tip]:hover::after { opacity: 1; }
+    thead th[data-tip]:hover { overflow: visible; }
 
     tbody td {
       padding: 11px 12px;
@@ -341,8 +433,14 @@
       <h1>PE Program Performance</h1>
       <div class="subtitle">Fund-level view across engagement phases, portfolio penetration, pipeline, and revenue</div>
     </div>
-    <div class="header-badge">Live · Synced from Snowflake</div>
+    <div class="header-right">
+      <div class="header-badge" id="sync-badge">Live · Synced from Snowflake</div>
+      <button class="sync-btn" id="syncBtn" onclick="triggerSync()">
+        <span class="sync-icon">↻</span> Sync now
+      </button>
+    </div>
   </div>
+  <div class="sync-toast" id="syncToast"></div>
 
   <!-- KPI Cards -->
   <div class="kpi-row">
@@ -410,17 +508,17 @@
       <table id="pe-table">
         <thead>
           <tr>
-            <th onclick="sortBy('fund')" title="PE fund name">FUND <span class="sort-arrow">↕</span></th>
-            <th onclick="sortBy('stage')" title="Engagement phase: Portco Recruiting → Activation → Portco Playbook Deployment">STAGE <span class="sort-arrow">↕</span></th>
-            <th onclick="sortBy('total_portcos')" style="text-align:right" title="Total portfolio companies tracked in Salesforce for this fund">PORTCOS <span class="sort-arrow">↕</span></th>
-            <th onclick="sortBy('enterprise_viable')" style="text-align:right" title="Portcos with Account Fit = Good Fit or Best Fit — ICP-qualified accounts">ENT VIABLE <span class="sort-arrow">↕</span></th>
-            <th onclick="sortBy('penetration')" title="Enterprise penetration: portcos on annual/enterprise contracts ÷ enterprise viable. Bar shows enterprise won (solid) + open pipe (light).">PENETRATION <span class="sort-arrow">↕</span></th>
-            <th onclick="sortBy('enterprise_won')" style="text-align:right" title="Portcos on annual enterprise contracts (excludes self-serve/PLG plans)">CLOSED WON <span class="sort-arrow">↕</span></th>
-            <th onclick="sortBy('won_arr')" style="text-align:right" title="Annualized recurring revenue from all customer portcos">WON ARR <span class="sort-arrow">↕</span></th>
-            <th onclick="sortBy('open_pipe_count')" style="text-align:right" title="Distinct portcos (not yet customers) with open opportunities in any stage except Closed Lost / Disqualified">OPEN PIPE # <span class="sort-arrow">↕</span></th>
-            <th onclick="sortBy('open_pipe_amount')" style="text-align:right" title="Total $ value of open opportunities across non-customer portcos">OPEN PIPE $ <span class="sort-arrow">↕</span></th>
-            <th onclick="sortBy('dq_closed_lost')" style="text-align:right" title="Distinct portcos with at least one Disqualified or Closed Lost opportunity">DQ / LOST <span class="sort-arrow">↕</span></th>
-            <th onclick="sortBy('total_spend')" style="text-align:right" title="Total cumulative Clay spend: enterprise contract value for enterprise accounts, Stripe invoices paid for self-serve accounts">TOTAL SPEND <span class="sort-arrow">↕</span></th>
+            <th onclick="sortBy('fund')" data-tip="PE fund name">FUND <span class="sort-arrow">↕</span></th>
+            <th onclick="sortBy('stage')" data-tip="Engagement phase: Portco Recruiting → Activation → Portco Playbook Deployment">STAGE <span class="sort-arrow">↕</span></th>
+            <th onclick="sortBy('total_portcos')" style="text-align:right" data-tip="Total portfolio companies tracked in Salesforce for this fund">PORTCOS <span class="sort-arrow">↕</span></th>
+            <th onclick="sortBy('enterprise_viable')" style="text-align:right" data-tip="Portcos with Account Fit = Good Fit or Best Fit — ICP-qualified accounts">ENT VIABLE <span class="sort-arrow">↕</span></th>
+            <th onclick="sortBy('penetration')" data-tip="Enterprise won ÷ Enterprise viable. Solid bar = enterprise contracts won. Light bar = open pipeline portcos.">PENETRATION <span class="sort-arrow">↕</span></th>
+            <th onclick="sortBy('enterprise_won')" style="text-align:right" data-tip="Portcos on annual enterprise contracts (excludes self-serve / PLG plans)">CLOSED WON <span class="sort-arrow">↕</span></th>
+            <th onclick="sortBy('won_arr')" style="text-align:right" data-tip="Annualized recurring revenue from all customer portcos">WON ARR <span class="sort-arrow">↕</span></th>
+            <th onclick="sortBy('open_pipe_count')" style="text-align:right" data-tip="Distinct portcos (not yet customers) with open opportunities — excludes Closed Lost and Disqualified">OPEN PIPE # <span class="sort-arrow">↕</span></th>
+            <th onclick="sortBy('open_pipe_amount')" style="text-align:right" data-tip="Total $ value of open opportunities across non-customer portcos">OPEN PIPE $ <span class="sort-arrow">↕</span></th>
+            <th onclick="sortBy('dq_closed_lost')" style="text-align:right" data-tip="Distinct portcos with at least one Disqualified or Closed Lost opportunity">DQ / LOST <span class="sort-arrow">↕</span></th>
+            <th onclick="sortBy('total_spend')" style="text-align:right" data-tip="Cumulative Clay spend: enterprise contract value for annual accounts + Stripe invoices paid for self-serve accounts">TOTAL SPEND <span class="sort-arrow">↕</span></th>
           </tr>
         </thead>
         <tbody id="table-body"></tbody>
@@ -627,6 +725,93 @@ function renderKPIs() {
   const cw    = data.reduce((s,d) => s + d.closed_won, 0);
   document.getElementById("kpi-arr").textContent = fmtMoney(spend);
   document.getElementById("kpi-arr-sub").textContent = `across ${cw} customer portcos`;
+}
+
+const GITHUB_OWNER = "ziqideng-sudo";
+const GITHUB_REPO  = "pe-dashboard";
+
+function getToken() {
+  let t = localStorage.getItem("gh_sync_token");
+  if (!t) {
+    t = prompt("Enter your GitHub personal access token to enable sync:\n(It will be saved locally in your browser)");
+    if (t) localStorage.setItem("gh_sync_token", t.trim());
+  }
+  return t ? t.trim() : null;
+}
+
+function toast(msg, duration = 5000) {
+  const el = document.getElementById("syncToast");
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove("show"), duration);
+}
+
+async function triggerSync() {
+  const btn = document.getElementById("syncBtn");
+  const badge = document.getElementById("sync-badge");
+  btn.disabled = true;
+  btn.classList.add("spinning");
+  btn.innerHTML = '<span class="sync-icon">↻</span> Syncing…';
+  badge.textContent = "Syncing…";
+
+  try {
+    const GITHUB_TOKEN = getToken();
+  if (!GITHUB_TOKEN) return;
+
+  const res = await fetch(
+      `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/workflows/sync.yml/dispatches`,
+      {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${GITHUB_TOKEN}`,
+          "Accept": "application/vnd.github+json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ ref: "main" }),
+      }
+    );
+
+    if (res.status === 204) {
+      badge.textContent = "Sync triggered ✓";
+      toast("✓ Sync started — the dashboard will refresh in ~60 seconds. Reload this page once it completes.");
+      // Poll for completion and auto-reload
+      let attempts = 0;
+      const poll = setInterval(async () => {
+        attempts++;
+        if (attempts > 20) { clearInterval(poll); return; }
+        try {
+          const r2 = await fetch(
+            `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/runs?per_page=1&event=workflow_dispatch`,
+            { headers: { "Authorization": `Bearer ${localStorage.getItem("gh_sync_token")}`, "Accept": "application/vnd.github+json" } }
+          );
+          const data = await r2.json();
+          const run = data.workflow_runs?.[0];
+          if (run?.status === "completed" && run?.conclusion === "success") {
+            clearInterval(poll);
+            badge.textContent = "Live · Just synced";
+            toast("✓ Data refreshed! Reloading…");
+            setTimeout(() => location.reload(), 1500);
+          }
+        } catch (_) {}
+      }, 5000);
+    } else {
+      const body = await res.json().catch(() => ({}));
+      if (res.status === 404) {
+        toast("⚠ Workflow not found. Make sure SNOWFLAKE_ACCOUNT, SNOWFLAKE_USER, and SNOWFLAKE_PASSWORD are set in GitHub Secrets.");
+      } else {
+        toast(`⚠ Sync failed (${res.status}): ${body.message || "unknown error"}`);
+      }
+      badge.textContent = "Live · Synced from Snowflake";
+    }
+  } catch (err) {
+    toast("⚠ Network error — check your connection and try again.");
+    badge.textContent = "Live · Synced from Snowflake";
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove("spinning");
+    btn.innerHTML = '<span class="sync-icon">↻</span> Sync now';
+  }
 }
 
 document.getElementById("updated-at").textContent =
