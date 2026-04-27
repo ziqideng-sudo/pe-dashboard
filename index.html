@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PE Program Performance Dashboard</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+      background: #f5f5f5;
+      color: #1a1a1a;
+      font-size: 13px;
+    }
+
+    .page {
+      max-width: 1300px;
+      margin: 0 auto;
+      padding: 28px 24px;
+    }
+
+    /* ── Header ── */
+    .header { margin-bottom: 20px; }
+    .header h1 { font-size: 20px; font-weight: 700; color: #111; }
+    .header .subtitle { font-size: 12px; color: #888; margin-top: 3px; }
+
+    /* ── KPI Row ── */
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .kpi-card {
+      background: #fff;
+      border: 1px solid #e8e8e8;
+      border-radius: 8px;
+      padding: 16px 18px;
+    }
+
+    .kpi-card .label {
+      font-size: 11px;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      margin-bottom: 6px;
+    }
+
+    .kpi-card .value {
+      font-size: 28px;
+      font-weight: 700;
+      color: #111;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+
+    .kpi-card .sub {
+      font-size: 11px;
+      color: #aaa;
+    }
+
+    /* ── Legend ── */
+    .legend {
+      display: flex;
+      gap: 18px;
+      margin-bottom: 14px;
+      align-items: center;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: #444;
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    /* ── Table Wrapper ── */
+    .table-wrapper {
+      background: #fff;
+      border: 1px solid #e8e8e8;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    /* ── Filters ── */
+    .table-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    .filter-select {
+      padding: 5px 10px;
+      border: 1px solid #e0e0e0;
+      border-radius: 5px;
+      background: #fff;
+      font-size: 12px;
+      color: #444;
+      cursor: pointer;
+    }
+
+    .filter-label { font-size: 12px; color: #666; }
+
+    /* ── Data Table ── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    thead th {
+      padding: 9px 12px;
+      text-align: left;
+      font-size: 10.5px;
+      font-weight: 600;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      border-bottom: 1px solid #f0f0f0;
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+      background: #fafafa;
+    }
+
+    thead th:hover { color: #333; background: #f5f5f5; }
+
+    thead th .sort-arrow { margin-left: 3px; opacity: 0.4; }
+    thead th.sorted .sort-arrow { opacity: 1; color: #6366f1; }
+
+    tbody td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #f7f7f7;
+      white-space: nowrap;
+      vertical-align: middle;
+    }
+
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover td { background: #fafbff; }
+
+    /* Total row */
+    tr.total-row td {
+      font-weight: 600;
+      border-top: 2px solid #e8e8e8;
+      background: #fafafa;
+    }
+
+    /* Fund name */
+    .fund-name { font-weight: 600; color: #111; font-size: 13px; }
+
+    /* Stage badges */
+    .badge {
+      display: inline-block;
+      padding: 3px 9px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    .badge-established {
+      background: #ede9fe;
+      color: #5b21b6;
+    }
+
+    .badge-live {
+      background: #dcfce7;
+      color: #15803d;
+    }
+
+    .badge-pilot {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    /* Penetration bar */
+    .pen-cell {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .pen-bar-wrap {
+      width: 100px;
+      height: 7px;
+      background: #f0f0f0;
+      border-radius: 4px;
+      overflow: hidden;
+      flex-shrink: 0;
+      display: flex;
+    }
+
+    .pen-bar-cw {
+      height: 100%;
+    }
+
+    .pen-bar-pipe {
+      height: 100%;
+      opacity: 0.35;
+      background-image: repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 3px,
+        rgba(255,255,255,0.6) 3px,
+        rgba(255,255,255,0.6) 5px
+      );
+    }
+
+    .pen-pct {
+      font-size: 12px;
+      font-weight: 500;
+      color: #333;
+      min-width: 32px;
+    }
+
+    /* Number cells */
+    .num { text-align: right; }
+    .num-zero { color: #ccc; }
+
+    /* ── Column Definitions ── */
+    .col-defs {
+      margin-top: 14px;
+      padding: 12px 14px;
+      background: #fff;
+      border: 1px solid #e8e8e8;
+      border-radius: 8px;
+      font-size: 11px;
+      color: #888;
+      line-height: 1.7;
+    }
+
+    .col-defs strong { color: #555; font-weight: 600; }
+
+    .updated-at {
+      font-size: 11px;
+      color: #bbb;
+      text-align: right;
+      margin-top: 10px;
+    }
+
+    @media (max-width: 900px) {
+      .kpi-row { grid-template-columns: repeat(2, 1fr); }
+      .table-wrapper { overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <div class="header">
+    <h1>PE program performance dashboard</h1>
+    <div class="subtitle">Fund-level view across engagement phases, portfolio penetration, pipeline, and revenue.</div>
+  </div>
+
+  <!-- KPI Cards -->
+  <div class="kpi-row">
+    <div class="kpi-card">
+      <div class="label">Active PE funds</div>
+      <div class="value" id="kpi-funds">–</div>
+      <div class="sub" id="kpi-funds-sub">–</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Total portcos in scope</div>
+      <div class="value" id="kpi-portcos">–</div>
+      <div class="sub" id="kpi-portcos-sub">–</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">PE pipeline (open)</div>
+      <div class="value" id="kpi-pipeline">–</div>
+      <div class="sub" id="kpi-pipeline-sub">–</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">PE won ARR (YTD)</div>
+      <div class="value" id="kpi-arr">–</div>
+      <div class="sub" id="kpi-arr-sub">–</div>
+    </div>
+  </div>
+
+  <!-- Legend + Filter -->
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+    <div class="legend">
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#7c3aed;"></div>
+        Portco Playbook Deployment
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#16a34a;"></div>
+        Activation
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#d97706;"></div>
+        Portco Recruiting
+      </div>
+      <div style="width:1px;height:14px;background:#e0e0e0;margin:0 4px;"></div>
+      <div class="legend-item">
+        <div style="width:22px;height:7px;border-radius:2px;background:#888;flex-shrink:0;"></div>
+        Closed won
+      </div>
+      <div class="legend-item">
+        <div style="width:22px;height:7px;border-radius:2px;background:#888;opacity:0.35;flex-shrink:0;"></div>
+        Open pipe
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span class="filter-label">Filter stage:</span>
+      <select class="filter-select" id="stageFilter" onchange="renderTable()">
+        <option value="all">All stages</option>
+        <option value="Portco Playbook Deployment">Portco Playbook Deployment</option>
+        <option value="Activation">Activation</option>
+        <option value="Portco Recruiting">Portco Recruiting</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="table-wrapper">
+    <table id="pe-table">
+      <thead>
+        <tr>
+          <th onclick="sortBy('fund')">FUND <span class="sort-arrow">↕</span></th>
+          <th onclick="sortBy('stage')">STAGE <span class="sort-arrow">↕</span></th>
+          <th onclick="sortBy('total_portcos')" style="text-align:right">TOTAL<br>PORTCOS <span class="sort-arrow">↕</span></th>
+          <th onclick="sortBy('enterprise_viable')" style="text-align:right">ENTERPRISE<br>VIABLE <span class="sort-arrow">↕</span></th>
+          <th onclick="sortBy('penetration')">PENETRATION <span class="sort-arrow">↕</span></th>
+          <th onclick="sortBy('dq_closed_lost')" style="text-align:right">DQ / CLOSED<br>LOST <span class="sort-arrow">↕</span></th>
+          <th onclick="sortBy('open_pipe_count')" style="text-align:right">OPEN PIPE<br>(COUNT) <span class="sort-arrow">↕</span></th>
+          <th onclick="sortBy('open_pipe_amount')" style="text-align:right">OPEN PIPE ($) <span class="sort-arrow">↕</span></th>
+          <th onclick="sortBy('closed_won')" style="text-align:right">CLOSED<br>WON <span class="sort-arrow">↕</span></th>
+          <th onclick="sortBy('won_arr')" style="text-align:right">WON ARR <span class="sort-arrow">↕</span></th>
+          <th onclick="sortBy('total_spend')" style="text-align:right">TOTAL SPEND<br>TO-DATE <span class="sort-arrow">↕</span></th>
+        </tr>
+      </thead>
+      <tbody id="table-body"></tbody>
+      <tfoot id="table-foot"></tfoot>
+    </table>
+  </div>
+
+  <!-- Column Definitions -->
+  <div class="col-defs">
+    <strong>Column definitions</strong><br>
+    <strong>Stage</strong> — Portco Recruiting → Activation → Portco Playbook Deployment ·
+    <strong>Total portcos</strong> — Portcos tracked in Salesforce for this fund ·
+    <strong>Enterprise viable</strong> — Portcos with Good Fit or Best Fit account score ·
+    <strong>Penetration</strong> — Solid bar = Closed won / Enterprise viable · Light bar = Open pipe portcos / Enterprise viable ·
+    <strong>DQ / Closed lost</strong> — Disqualified or lost opps ·
+    <strong>Open pipe</strong> — Opps in S2–S5 ·
+    <strong>Closed won</strong> — Won portco accounts ·
+    <strong>Won ARR</strong> — ARR from CW portcos ·
+    <strong>Total spend to-date</strong> — Cumulative Clay spend (incl. overages, expansions)
+  </div>
+
+  <div class="updated-at" id="updated-at"></div>
+</div>
+
+<script>
+const RAW_DATA = [
+  // stage names match Salesforce / framework exactly
+  {fund:"HgCapital LLP",          stage:"Portco Playbook Deployment", total_portcos:59,  enterprise_viable:50, open_pipe_count:16, open_pipe_amount:1220000, closed_won:13, won_arr:906000,  dq_closed_lost:26, total_spend:888000},
+  {fund:"Vista Equity Partners",  stage:"Activation",                 total_portcos:109, enterprise_viable:89, open_pipe_count:22, open_pipe_amount:1830000, closed_won:25, won_arr:1340000, dq_closed_lost:43, total_spend:1750000},
+  {fund:"Permira Advisers LLC",   stage:"Activation",                 total_portcos:87,  enterprise_viable:34, open_pipe_count:14, open_pipe_amount:921000,  closed_won:9,  won_arr:636000,  dq_closed_lost:21, total_spend:807000},
+  {fund:"HIG Capital",            stage:"Activation",                 total_portcos:140, enterprise_viable:14, open_pipe_count:3,  open_pipe_amount:96000,   closed_won:3,  won_arr:59000,   dq_closed_lost:6,  total_spend:95000},
+  {fund:"General Atlantic",       stage:"Portco Recruiting",          total_portcos:243, enterprise_viable:91, open_pipe_count:15, open_pipe_amount:974000,  closed_won:28, won_arr:3020000, dq_closed_lost:48, total_spend:3400000},
+  {fund:"TPG",                    stage:"Portco Recruiting",          total_portcos:251, enterprise_viable:71, open_pipe_count:12, open_pipe_amount:527000,  closed_won:14, won_arr:2490000, dq_closed_lost:24, total_spend:3050000},
+  {fund:"TCV",                    stage:"Portco Recruiting",          total_portcos:85,  enterprise_viable:59, open_pipe_count:9,  open_pipe_amount:340000,  closed_won:24, won_arr:1490000, dq_closed_lost:42, total_spend:2380000},
+  {fund:"Goldman Sachs",          stage:"Portco Recruiting",          total_portcos:243, enterprise_viable:63, open_pipe_count:13, open_pipe_amount:592000,  closed_won:16, won_arr:899000,  dq_closed_lost:32, total_spend:955000},
+  {fund:"KKR",                    stage:"Portco Recruiting",          total_portcos:411, enterprise_viable:89, open_pipe_count:16, open_pipe_amount:820000,  closed_won:14, won_arr:894000,  dq_closed_lost:38, total_spend:959000},
+  {fund:"Thoma Bravo",            stage:"Portco Recruiting",          total_portcos:80,  enterprise_viable:68, open_pipe_count:18, open_pipe_amount:1240000, closed_won:8,  won_arr:545000,  dq_closed_lost:32, total_spend:858000},
+  {fund:"Advent",                 stage:"Portco Recruiting",          total_portcos:121, enterprise_viable:48, open_pipe_count:7,  open_pipe_amount:440000,  closed_won:4,  won_arr:115000,  dq_closed_lost:19, total_spend:114000},
+  {fund:"CVC",                    stage:"Portco Recruiting",          total_portcos:178, enterprise_viable:38, open_pipe_count:6,  open_pipe_amount:83000,   closed_won:4,  won_arr:62000,   dq_closed_lost:17, total_spend:73000},
+  {fund:"Cove Hill Partners",     stage:"Portco Recruiting",          total_portcos:11,  enterprise_viable:9,  open_pipe_count:8,  open_pipe_amount:110000,  closed_won:2,  won_arr:17000,   dq_closed_lost:4,  total_spend:24000},
+  {fund:"Nordic Capital",         stage:"Portco Recruiting",          total_portcos:57,  enterprise_viable:19, open_pipe_count:6,  open_pipe_amount:190000,  closed_won:1,  won_arr:10000,   dq_closed_lost:5,  total_spend:13000},
+  {fund:"Growth Factors",         stage:"Portco Recruiting",          total_portcos:0,   enterprise_viable:0,  open_pipe_count:0,  open_pipe_amount:0,       closed_won:0,  won_arr:0,       dq_closed_lost:0,  total_spend:0},
+  {fund:"Parthenon Capital",      stage:"Portco Recruiting",          total_portcos:0,   enterprise_viable:0,  open_pipe_count:0,  open_pipe_amount:0,       closed_won:0,  won_arr:0,       dq_closed_lost:0,  total_spend:0},
+  {fund:"Khosla Ventures",        stage:"Portco Recruiting",          total_portcos:0,   enterprise_viable:0,  open_pipe_count:0,  open_pipe_amount:0,       closed_won:0,  won_arr:0,       dq_closed_lost:0,  total_spend:0},
+];
+
+const STAGE_ORDER = { "Portco Playbook Deployment": 0, "Activation": 1, "Portco Recruiting": 2 };
+
+let sortCol = "stage";
+let sortDir = "asc";
+
+function penetration(d) {
+  if (d.enterprise_viable === 0) return null;
+  return Math.min(d.closed_won / d.enterprise_viable, 1);
+}
+
+function fmtMoney(v) {
+  if (v === 0) return "$0";
+  if (v >= 1e6) return "$" + (v / 1e6).toFixed(1) + "M";
+  if (v >= 1e3) return "$" + Math.round(v / 1e3) + "K";
+  return "$" + Math.round(v);
+}
+
+function fmtNum(v) {
+  return v === 0 ? "0" : v.toLocaleString();
+}
+
+function stageBadge(stage) {
+  if (stage === "Portco Playbook Deployment") return '<span class="badge badge-established">Portco Playbook Deployment</span>';
+  if (stage === "Activation")                 return '<span class="badge badge-live">Activation</span>';
+  return '<span class="badge badge-pilot">Portco Recruiting</span>';
+}
+
+function stageBarColor(stage) {
+  if (stage === "Portco Playbook Deployment") return "#7c3aed";
+  if (stage === "Activation")                 return "#16a34a";
+  return "#d97706";
+}
+
+function numCell(v, fmt) {
+  const s = fmt === "money" ? fmtMoney(v) : fmtNum(v);
+  return `<td class="num${v === 0 ? " num-zero" : ""}">${s}</td>`;
+}
+
+function sortBy(col) {
+  if (sortCol === col) {
+    sortDir = sortDir === "asc" ? "desc" : "asc";
+  } else {
+    sortCol = col;
+    sortDir = col === "stage" || col === "fund" ? "asc" : "desc";
+  }
+  renderTable();
+}
+
+function filtered() {
+  const stage = document.getElementById("stageFilter").value;
+  let data = [...RAW_DATA];
+  if (stage !== "all") data = data.filter(d => d.stage === stage);
+  return data;
+}
+
+function sortedData(data) {
+  return [...data].sort((a, b) => {
+    let av, bv;
+    if (sortCol === "fund")              { av = a.fund; bv = b.fund; }
+    else if (sortCol === "stage")        { av = STAGE_ORDER[a.stage]; bv = STAGE_ORDER[b.stage]; }
+    else if (sortCol === "penetration")  { av = penetration(a) ?? -1; bv = penetration(b) ?? -1; }
+    else                                 { av = a[sortCol]; bv = b[sortCol]; }
+    const cmp = av < bv ? -1 : av > bv ? 1 : 0;
+    return sortDir === "asc" ? cmp : -cmp;
+  });
+}
+
+function renderTable() {
+  const data = filtered();
+  const sorted = sortedData(data);
+
+  // Update sort headers
+  document.querySelectorAll("thead th").forEach(th => th.classList.remove("sorted"));
+
+  const tbody = document.getElementById("table-body");
+  tbody.innerHTML = sorted.map(d => {
+    const pen = penetration(d);
+    const penPct = pen === null ? "—" : Math.round(pen * 100) + "%";
+    const cwWidth = pen === null ? 0 : Math.round(pen * 100);
+    const pipeWidth = d.enterprise_viable > 0
+      ? Math.min(Math.round(d.open_pipe_count / d.enterprise_viable * 100), 100 - cwWidth)
+      : 0;
+    const barColor = stageBarColor(d.stage);
+
+    return `<tr>
+      <td class="fund-name">${d.fund}</td>
+      <td>${stageBadge(d.stage)}</td>
+      <td class="num">${fmtNum(d.total_portcos)}</td>
+      <td class="num">${fmtNum(d.enterprise_viable)}</td>
+      <td>
+        <div class="pen-cell">
+          <div class="pen-bar-wrap" title="Closed won: ${cwWidth}% · Open pipe: ${pipeWidth}%">
+            <div class="pen-bar-cw" style="width:${cwWidth}%;background:${barColor};"></div>
+            <div class="pen-bar-pipe" style="width:${pipeWidth}%;background:${barColor};"></div>
+          </div>
+          <span class="pen-pct">${penPct}</span>
+        </div>
+      </td>
+      ${numCell(d.dq_closed_lost, "num")}
+      ${numCell(d.open_pipe_count, "num")}
+      ${numCell(d.open_pipe_amount, "money")}
+      ${numCell(d.closed_won, "num")}
+      ${numCell(d.won_arr, "money")}
+      ${numCell(d.total_spend, "money")}
+    </tr>`;
+  }).join("");
+
+  // Totals row
+  const tot = {
+    total_portcos:     data.reduce((s, d) => s + d.total_portcos, 0),
+    enterprise_viable: data.reduce((s, d) => s + d.enterprise_viable, 0),
+    open_pipe_count:   data.reduce((s, d) => s + d.open_pipe_count, 0),
+    open_pipe_amount:  data.reduce((s, d) => s + d.open_pipe_amount, 0),
+    closed_won:        data.reduce((s, d) => s + d.closed_won, 0),
+    won_arr:           data.reduce((s, d) => s + d.won_arr, 0),
+    dq_closed_lost:    data.reduce((s, d) => s + d.dq_closed_lost, 0),
+    total_spend:       data.reduce((s, d) => s + d.total_spend, 0),
+  };
+  const totCwWidth = tot.enterprise_viable > 0
+    ? Math.round(Math.min(tot.closed_won / tot.enterprise_viable, 1) * 100)
+    : 0;
+  const totPipeWidth = tot.enterprise_viable > 0
+    ? Math.min(Math.round(tot.open_pipe_count / tot.enterprise_viable * 100), 100 - totCwWidth)
+    : 0;
+  const totPen = tot.enterprise_viable > 0 ? totCwWidth + "%" : "—";
+
+  const tfoot = document.getElementById("table-foot");
+  tfoot.innerHTML = `<tr class="total-row">
+    <td><strong>Total</strong></td>
+    <td></td>
+    <td class="num">${fmtNum(tot.total_portcos)}</td>
+    <td class="num">${fmtNum(tot.enterprise_viable)}</td>
+    <td><div class="pen-cell"><div class="pen-bar-wrap"><div class="pen-bar-cw" style="width:${totCwWidth}%;background:#6366f1;"></div><div class="pen-bar-pipe" style="width:${totPipeWidth}%;background:#6366f1;"></div></div><span class="pen-pct">${totPen}</span></div></td>
+    ${numCell(tot.dq_closed_lost, "num")}
+    ${numCell(tot.open_pipe_count, "num")}
+    ${numCell(tot.open_pipe_amount, "money")}
+    ${numCell(tot.closed_won, "num")}
+    ${numCell(tot.won_arr, "money")}
+    ${numCell(tot.total_spend, "money")}
+  </tr>`;
+}
+
+function renderKPIs() {
+  const data = RAW_DATA;
+  const ppd   = data.filter(d => d.stage === "Portco Playbook Deployment").length;
+  const activ = data.filter(d => d.stage === "Activation").length;
+  const recr  = data.filter(d => d.stage === "Portco Recruiting").length;
+
+  document.getElementById("kpi-funds").textContent = data.length;
+  document.getElementById("kpi-funds-sub").textContent =
+    `${ppd} playbook deployment · ${activ} activation · ${recr} recruiting`;
+
+  const portcos = data.reduce((s, d) => s + d.total_portcos, 0);
+  const ev      = data.reduce((s, d) => s + d.enterprise_viable, 0);
+  const evPct   = portcos > 0 ? Math.round(ev / portcos * 100) : 0;
+  document.getElementById("kpi-portcos").textContent = portcos.toLocaleString();
+  document.getElementById("kpi-portcos-sub").textContent =
+    `Enterprise-viable: ${ev} (${evPct}%)`;
+
+  const pipe = data.reduce((s, d) => s + d.open_pipe_amount, 0);
+  const pipeCount = data.reduce((s, d) => s + d.open_pipe_count, 0);
+  document.getElementById("kpi-pipeline").textContent = fmtMoney(pipe);
+  document.getElementById("kpi-pipeline-sub").textContent =
+    `${pipeCount} open opportunities`;
+
+  const arr = data.reduce((s, d) => s + d.won_arr, 0);
+  const cw  = data.reduce((s, d) => s + d.closed_won, 0);
+  document.getElementById("kpi-arr").textContent = fmtMoney(arr);
+  document.getElementById("kpi-arr-sub").textContent =
+    `${cw} closed won accounts`;
+}
+
+document.getElementById("updated-at").textContent =
+  "Data as of " + new Date().toLocaleDateString("en-US", {month:"long", day:"numeric", year:"numeric"});
+
+renderKPIs();
+renderTable();
+</script>
+</body>
+</html>
