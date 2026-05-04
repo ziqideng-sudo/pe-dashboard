@@ -34,7 +34,7 @@ SELECT
     END AS fund,
     COUNT(DISTINCT portco_id)                                                                                    AS total_portcos,
     COUNT(DISTINCT CASE WHEN portco.ACCOUNT_FIT_C IN ('Good Fit','Best Fit') THEN portco_id END)                AS enterprise_viable,
-    COUNT(DISTINCT CASE WHEN dbt.TYPE='Customer' AND ctotal.contract_total IS NOT NULL THEN portco_id END)      AS enterprise_won,
+    COUNT(DISTINCT CASE WHEN dbt.TYPE='Customer' AND dbt.PRODUCT_TIER_C='Enterprise' THEN portco_id END)        AS enterprise_won,
     COUNT(DISTINCT CASE WHEN dbt.TYPE = 'Customer' THEN portco_id END)                                          AS closed_won,
     SUM(DISTINCT CASE WHEN dbt.TYPE = 'Customer' THEN ROUND(dbt.ARR) ELSE 0 END)                               AS won_arr,
     COUNT(DISTINCT CASE WHEN opp.ACCOUNT_ID IS NOT NULL AND NVL(dbt.TYPE,'x') != 'Customer' THEN portco_id END) AS open_pipe_count,
@@ -61,6 +61,16 @@ FROM (
         '001a700000CKV5vAAH','001Hs00003WTfZ5IAL','001a700000DSqcKAAT','001a700000OzLbTAAV',
         '001a700000DuSpGAAV','001a700000RaIN3AAN','001a700000E80WtAAJ','001a700000W6l3XAAR','001a700000BBMfGAAX')
       AND a.TYPE IN ('Prospect','Customer','Partner')
+    UNION ALL
+    -- Source 3: PE fund tagged as PARTNER_ACCOUNT_C on Opportunity
+    SELECT opp.PARTNER_ACCOUNT_C AS pe_id, opp.ACCOUNT_ID AS portco_id
+    FROM FIVETRAN.SALESFORCE.OPPORTUNITY opp
+    WHERE opp.IS_DELETED = FALSE
+      AND opp.PARTNER_ACCOUNT_C IN (
+        '001a700000DVEQfAAP','001a7000008fXWrAAM','001Hs00003VUZ0GIAX','001a700000QVNpYAAX',
+        '001a700000FNFfNAAX','001a700000Q8INfAAN','001Hs00003XjNQIIA3','001Hs00003Uc7eiIAB',
+        '001a700000CKV5vAAH','001Hs00003WTfZ5IAL','001a700000DSqcKAAT','001a700000OzLbTAAV',
+        '001a700000DuSpGAAV','001a700000RaIN3AAN','001a700000E80WtAAJ','001a700000W6l3XAAR','001a700000BBMfGAAX')
 ) src
 JOIN FIVETRAN.SALESFORCE.ACCOUNT portco ON portco.ID = src.portco_id AND portco.IS_DELETED = FALSE
 LEFT JOIN DBT.PROD.ACCOUNTS dbt ON dbt.ACCOUNT_ID = portco.ID
@@ -79,7 +89,7 @@ STAGE_MAP = {
     "HIG Capital":           "Activation",
 }
 
-ZERO_FUNDS = ["Growth Factors", "Parthenon Capital", "Khosla Ventures"]
+ZERO_FUNDS = []  # all funds now appear via opportunity partner source
 
 def fmt(v):
     return int(round(float(v))) if v is not None else 0
